@@ -1,0 +1,63 @@
+%% Parameters
+
+%Simulation Time Parameters
+Total_time = .1; %Total Simulated Time
+fs = 1e-7; %Sample rate
+t = 0:fs:Total_time-fs;  %Time vector
+
+%chirp Prameters
+Fc = 1; %Chirp Carrier Frequency
+BW = 200e6; %Chirsp Bandwidth
+Tp = 1e-3; %Chirp Duration
+alpha = BW / Tp; %Sweep Rate
+
+%Node Parameters
+numNodes = 1; %Number of Nodes
+Tb = 1e-5; %Node bit Period
+
+%% Create nodes
+nodes = createNodes(numNodes);
+
+%% Generate Backscatter Symbol Waveforms as seen from transmitter
+for i = 1:numNodes
+nodes(i).bitwaveformString = backscatterSymbolGen(nodes(i),Tb,t);
+end
+
+%% Generate Baseband Chirp
+tx_chirp = chirp(Fc,BW,Tp,t);
+
+s = zeros(size(t));
+% %% Signal Recieved at Transmitter
+for i = 1:numNodes
+    % Calculate the contribution from each node
+    contribution = nodes(i).attenuation * (tx_chirp .* nodes(i).bitwaveformString);
+    s = s + contribution;
+end
+
+
+%%DeChriping the signal
+s = s .8 conj()
+
+% Plot
+figure;
+plot(f_axis, abs(Y));
+xlabel('Frequency (Hz)');
+ylabel('Amplitude');
+title('FFT of De-chirped Signal (Baseband)');
+xlim([0, 2e6]);  % ~2 MHz is enough to see a ~100 m target beat
+
+figure;
+plot(t, real(tx_chirp), 'r', 'LineWidth', 2);  % Plot sine in red
+hold on;
+plot(t,real(s), 'b--', 'LineWidth', 2); % Plot cosine in blue dashed line
+plot(t, nodes(i).bitwaveformString, 'g--', 'LineWidth', 2); % Plot cosine in blue dashed line
+hold off;
+
+% Peak frequency
+[~, idx] = max(abs(Y));
+f_beat = f_axis(idx);
+fprintf('Beat Frequency: %.2f Hz\n', f_beat);
+
+%% Range from beat frequency
+R_est = (3e8 * f_beat) / (2 * alpha);
+fprintf('Estimated Range: %.2f meters\n', R_est);
