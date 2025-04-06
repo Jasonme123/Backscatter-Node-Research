@@ -3,37 +3,35 @@ close all
 
 %Simulation Time Parameters
 Total_time = .002; %Total Simulated Time
+Total_time = 1; %Total Simulated Time
 fs = 1e-7; %Sample rate
 t = 0:fs:Total_time-fs;  %Time vector
 
 %chirp Prameters
 Fc = 1; %Chirp Carrier Frequency
-BW = 200e6; %Chirsp Bandwidth
-Tp = 1e-3; %Chirp Duration
+BW = 100e6; %Chirsp Bandwidth
+Tp = 2; %Chirp Duration
 alpha = BW / Tp; %Sweep Rate
 
 %Node Parameters
-numNodes = 1; %Number of Nodes
-Tb = 1e-5; %Node bit Period
+numNodes = 3; %Number of Nodes
+Tb = 1e-3; %Node bit Period
 
 %% Create nodes
 nodes = createNodes(numNodes);
 
-%% Generate Backscatter Symbol Waveforms as seen from transmitter
-for i = 1:numNodes
-nodes(i).bitwaveformString = backscatterSymbolGen(nodes(i),Tb,t);
-end
-
 %% Generate Baseband Chirp
 tx_chirp = chirp(Fc,BW,Tp,t);
 
-s = zeros(size(t));
-% %% Signal Recieved at Transmitter
-for i = 1:numNodes
-    % Calculate the contribution from each node
-    contribution = nodes(i).attenuation * (tx_chirp .* nodes(i).bitwaveformString);
-    s = s + contribution;
-end
+% s = zeros(size(t));
+% % %% Signal Recieved at Transmitter
+% for i = 1:numNodes
+%     % Calculate the contribution from each node
+%     contribution = nodes(i).attenuation * (tx_chirp .* nodes(i).bitwaveformString);
+%     s = s + contribution;
+% end
+
+tx_chirp 
 
 
 %%DeChriping the signal
