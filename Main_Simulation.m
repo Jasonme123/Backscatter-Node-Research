@@ -1,69 +1,37 @@
-%% Parameters
-close all
+%% Main_Simulation.m  -- top-level driver. Just flags + scenario calls.
 
-%Simulation Time Parameters
-Total_time = .002; %Total Simulated Time
-Total_time = 1; %Total Simulated Time
-fs = 1e-7; %Sample rate
-t = 0:fs:Total_time-fs;  %Time vector
+clear; close all; clc;
 
-%chirp Prameters
-Fc = 1; %Chirp Carrier Frequency
-BW = 100e6; %Chirsp Bandwidth
-Tp = 2; %Chirp Duration
-alpha = BW / Tp; %Sweep Rate
+% ---- Flags -------------------------------------------------------------
+PLACEMENT_MODE = 'fixed';   % 'fixed'  -> same positions each run
+                            % 'random' -> different positions each run
+N_TAGS         = 3;
+RANGE_MIN      = 3;         % meters, min tag-to-reader distance
+RANGE_MAX      = 10;        % meters, max tag-to-reader distance
 
-%Node Parameters
-numNodes = 3; %Number of Nodes
-Tb = 1e-3; %Node bit Period
+% ---- Common parameters -------------------------------------------------
+sim_params; 
 
-%% Create nodes
-nodes = createNodes(numNodes);
+% ---- Place nodes -------------------------------------------------------
+nodes  = placeNodes2D(N_TAGS, RANGE_MIN, RANGE_MAX, PLACEMENT_MODE);
+true_d = arrayfun(@(nd) nd.range, nodes);
 
-%% Generate Baseband Chirp
-tx_chirp = chirp(Fc,BW,Tp,t);
+% ---- Per-tag link-budget / SNR diagnostic ------------------------------
+lambda_c   = c / fc;
+Pr_per_tag = link.Pt * link.refl .* (lambda_c ./ (4*pi*true_d)).^4;
 
-% s = zeros(size(t));
-% % %% Signal Recieved at Transmitter
-% for i = 1:numNodes
-%     % Calculate the contribution from each node
-%     contribution = nodes(i).attenuation * (tx_chirp .* nodes(i).bitwaveformString);
-%     s = s + contribution;
-% end
+fprintf('\nPer-tag link budget @ fc = %.3f GHz, P_noise = %.2e W:\n', fc/1e9, P_noise);
+for n = 1:numel(nodes)
+    Pr_dBm = 10*log10(Pr_per_tag(n)/1e-3);
+    if P_noise > 0
+        snr_str = sprintf('%7.2f dB', 10*log10(Pr_per_tag(n)/P_noise));
+    else
+        snr_str = '    Inf (noise-free)';
+    end
+    fprintf('  Tag %d   d = %6.2f m   Pr = %7.2f dBm   SNR = %s\n', ...
+        n, true_d(n), Pr_dBm, snr_str);
+end
 
-tx_chirp 
-
-
-%%DeChriping the signal
-Recieved = s .* conj(tx_chirp);
-
-% FFT processing to see the tones:
-Nfft = 2^nextpow2(length(t));
-Y = fft(Recieved, Nfft);
-f_axis = linspace(0, 1/fs, Nfft);
-
-% Plot
-figure;
-plot(f_axis, abs(Y));
-xlabel('Frequency (Hz)');
-ylabel('Amplitude');
-title('FFT of De-chirped Signal (Baseband)');
-xlim([0, 2e6]);  
-
-figure;
-plot(t, real(tx_chirp), 'r', 'LineWidth', 2);
-hold on;
-plot(t,real(s), 'b--', 'LineWidth', 2); 
-plot(t, nodes(i).bitwaveformString, 'g--', 'LineWidth', 2); 
-hold off;
-
-% Peak frequency
-[~, idx] = max(abs(Y));
-f_beat = f_axis(idx);
-fprintf('Beat Frequency: %.2f Hz\n', f_beat);
-
-%% Range from beat frequency
-R_est = (3e8 * f_beat) / (2 * alpha);
-R_act = sqrt(nodes(1).x^2 + nodes(1).y^2);
-fprintf('Estimated Range: %.2f meters\n', R_est);
-fprintf('Actual Range: %.2f meters\n', R_act);
+% ---- Run scenarios -----------------------------------------------------
+scenario_pbr_rssi;
+scenario_pbr_only;
